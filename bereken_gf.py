@@ -4,19 +4,20 @@ import csv
 import pandas as pd
 
 # Input
-GF_MAP = "GF_brondata/clusterdata/"
-UF_CSV = "GF_brondata/uitkeringsfactor.csv"
-OUTPUT_MAP = "GF_data/"
+GF_MAP = "Brondata/GF/clusterdata/"
+UF_CSV = "Brondata/GF/uitkeringsfactor.csv"
+OUTPUT_MAP = "Analysedata/GF/"
 
 def main():
     circulaires = get_gf_data(GF_MAP, UF_CSV)
     
-    clusters = calculate_clusters(circulaires, UF_CSV)
-    
-    for key, value in clusters.items():
-        print(key)
-        value.to_csv(OUTPUT_MAP + key + ".csv")
+    if circulaires:
+        clusters = calculate_clusters(circulaires, UF_CSV)
         
+    if clusters:
+        for key, value in clusters.items():
+            print(key)
+            value.to_csv(OUTPUT_MAP + key + ".csv")
 
 
 def get_gf_data(gf_map, uf_csv):
@@ -27,15 +28,13 @@ def get_gf_data(gf_map, uf_csv):
     gf_files = os.listdir(gf_map)
     gewichten_files = [file for file in gf_files if "gewichten" in file.lower()]
     volumina_files = [file for file in gf_files if "volumina" in file.lower()]
-    id_gew_files = [file for file in gf_files if "id_gew" in file.lower()]
     siudu_files = [file for file in gf_files if "siudu" in file.lower()]
     
     for g in gewichten_files:
         volumina = any(file.startswith(g[:13]) for file in volumina_files)
-        id_gew = any(file.startswith(g[:13]) for file in id_gew_files)
         siudu = any(file.startswith(g[:13]) for file in siudu_files)
         
-        if volumina and id_gew and siudu and g[3:13] in uf_checklist:
+        if volumina and siudu and g[3:13] in uf_checklist:
             gf_data.append(g[:13])
             
     return gf_data
@@ -55,20 +54,17 @@ def calculate_clusters(circulaires, uf_csv):
     for circulaire in circulaires:
         uf_checklist, uf_list = get_uf(uf_csv)
         
-        df_gewichten = pd.read_csv(GF_MAP + circulaire + "_Gewichten.csv") 
-        df_volumina = pd.read_csv(GF_MAP + circulaire + "_Volumina.csv")
-        df_id_gew = pd.read_csv(GF_MAP + circulaire + "_ID_gew.csv")
-        df_siudu = pd.read_csv(GF_MAP + circulaire + "_SIUDU.csv")
+        df_gewichten = pd.read_csv(GF_MAP + circulaire + "_Gewichten.csv", sep='\t', decimal=',', thousands='.') 
+        df_volumina = pd.read_csv(GF_MAP + circulaire + "_Volumina.csv", sep='\t', decimal=',', thousands='.')
+        df_siudu = pd.read_csv(GF_MAP + circulaire + "_SIUDU.csv", sep='\t', decimal=',', thousands='.')
         
         # Define indices, set to numeric
         df_gewichten = df_gewichten.set_index("Codering maatstaf")
         df_volumina = df_volumina.set_index("Naam")
-        df_id_gew = df_id_gew.set_index("Naam maatstaf")
         df_siudu = df_siudu.set_index("Naam")
         
         df_gewichten = df_gewichten.apply(safe_to_numeric)
         df_volumina = df_volumina.apply(safe_to_numeric)
-        df_id_gew = df_id_gew.apply(safe_to_numeric)
         df_siudu = df_siudu.apply(safe_to_numeric)
         
         # Take clusters from gewichten
@@ -83,23 +79,45 @@ def calculate_clusters(circulaires, uf_csv):
             linedict = {}
     
             gemeente = r.name
+            
+            # Create dicts for volumina/siudu column names and values per gemeente
+            volumina_columns = df_volumina.columns[2:]
             volumina_values = r[2:].values
-            siudu_values = df_siudu.loc[gemeente].values
+            volumina_dict = {v: w for v, w in zip(volumina_columns, volumina_values)}
+            
+            siudu_columns = df_siudu.columns[2:]
+            siudu_values = df_siudu.loc[gemeente].values[2:]
+            siudu_dict = {v: w for v, w in zip(siudu_columns, siudu_values)}
             
             for c in clusters:
         
-                gewichten_per_cluster = df_gewichten[c].values
-                gewichten_siudu = df_id_gew[c].values
+                # Create dicts for gewichten column names and values per gemeente where index != nan (excludes IUDU)
+                gewichten_rows = df_gewichten.index[df_gewichten.index.notna()]
+                gewichten_per_cluster = df_gewichten[c][df_gewichten.index.notna()].values
+                gewichten_dict = {v: w for v, w in zip(gewichten_rows, gewichten_per_cluster)}
+                
+                # SIUDU gewichten: ART 12 added manually to cluster Overig
+                siudu_gewichten_namen = list(df_gewichten[df_gewichten.index.isna()]['Naam maatstaf'])
+                siudu_gewichten = list(df_gewichten[df_gewichten.index.isna()][c])
+                siudu_gewichten_dict = {v: w for v, w in zip(siudu_gewichten_namen, siudu_gewichten)}
+                
+                cluster_total = 0
 
-                print(gewichten_siudu)
-                print(siudu_values)
-                if len(volumina_values) == len(gewichten_per_cluster) and len(gewichten_siudu) == len(siudu_values):
-                    print("check")
-                    cluster_total = uf*sum(v * w for v, w in zip(volumina_values, gewichten_per_cluster))
-                    siudu_total = sum()
+                # Match dict keys of gewichten and volumina for AU clusters
+                if len(gewichten_dict) == len(volumina_dict):
+                    for key in gewichten_dict.keys():
+                        if key in volumina_dict:
+                            cluster_total += uf * gewichten_dict[key] * volumina_dict[key]
+                
+                # Match dict keys of gewichten and volumina for SIUDU
+                if len(siudu_gewichten_dict) == len(siudu_dict):
+                    for key in siudu_gewichten_dict.keys():
+                        if key in siudu_dict:
+                            cluster_total += siudu_gewichten_dict[key] * siudu_dict[key]
+                
+                linedict[c] = cluster_total
                     
-    
-        outputdict[gemeente] = linedict 
+            outputdict[gemeente] = linedict 
         
         cluster_data_dict[circulaire] = pd.DataFrame(outputdict).T
     
