@@ -4,6 +4,7 @@ import pandas as pd
 
 # Globals
 IV3_MAP = "Brondata/Iv3/"
+#GROOTTEKLASSEN PROVINCIES VOOR VERGELIJKING
 
 def main():
     
