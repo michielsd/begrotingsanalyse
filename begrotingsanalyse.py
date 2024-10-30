@@ -6,8 +6,8 @@ import streamlit as st
 import matplotlib
 
 # Globals
-JAAR_MINIMUM = 2017
-JAAR_MAXIMUM = 2023
+JAAR_MINIMUM = 2024
+JAAR_MAXIMUM = 2024
 
 
 # Data import
@@ -62,7 +62,35 @@ def filter_data(data,
     return filtered_data
 
 
-# SIDEBAR:
+# Wide screen
+st.set_page_config(layout="wide")
+
+# Body
+header_container = st.container()
+
+# Sidebar
+with st.sidebar:
+    st.header("Selecteer hier de analyse")
+    
+    selected_jaar = st.selectbox("Selecteer hier het begrotingsjaar",
+                                 range(JAAR_MINIMUM, JAAR_MAXIMUM),
+                                 key=0)
+
+
+with header_container:
+    ch1, ch2, ch3 = st.columns([2, 4, 2])
+
+    with ch2:
+        st.title("📊 Begrotingsanalyse")
+        st.markdown(
+            "Begrotingsanalyse"
+        )
+        )
+        st.markdown(
+            "Dit is een voorlopige versie, fouten voorbehouden. Vragen of opmerkingen? Stuur een mail naar <postbusiv3@minbzk.nl>."
+        )
+
+
 # KIES GEMEENTE
 # KIES OVERHEAD
 # KIES VERGELIJKING

@@ -117,10 +117,13 @@ def calculate_clusters(circulaires, uf_csv):
                 
                 linedict[c] = cluster_total
                     
-            outputdict[gemeente] = linedict 
-        
-        cluster_data_dict[circulaire] = pd.DataFrame(outputdict).T
-    
+            outputdict[gemeente] = linedict
+            
+        df = pd.DataFrame(outputdict).T
+        df = df.reset_index()
+        df = df.rename(columns={"index": "Gemeenten"})
+
+        cluster_data_dict[circulaire] = df
     return cluster_data_dict
         
 
