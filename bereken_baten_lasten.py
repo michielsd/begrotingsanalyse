@@ -1,4 +1,5 @@
 import os
+import csv
 from pathlib import Path
 
 import pandas as pd
@@ -6,6 +7,7 @@ import pandas as pd
 # Globals
 IV3_MAP = "Brondata/Iv3/"
 CLASSES = "Brondata/Gemeenteklassen/"
+NAMES = "Brondata/gemeentenamen.csv"
 ANALYSEMAP = "Analysedata/Iv3/"
 
 def main():
@@ -22,10 +24,11 @@ def main():
         # Create output df
         df = pd.read_csv(str(IV3_MAP) + file)
         
-        totalen = get_taakveld_totals(df)
-        output_df = add_class_data(totalen, jaar)
+        totals = get_taakveld_totals(df)
+        totals_w_classes = add_class_data(totals, jaar)
+        output_df = replace_gemeente_names(totals_w_classes)
         
-        output_df.to_csv(str(ANALYSEMAP) + output_name, index=False)
+        output_df.to_csv(str(ANALYSEMAP) + output_name, sep=";", index=False) # ; For Nuenen Gerwen
         print(output_name)
                 
 def get_taakveld_totals(df):
@@ -42,8 +45,9 @@ def get_taakveld_totals(df):
     pv['Baten'] = pv[batencolumns].sum(axis=1)
     pv['Lasten'] = pv[lastencolumns].sum(axis=1)
     
-    # Remove Balanspost and columns with Categorie
+    # Remove Balanspost and columns with Categorie excl. Salarislasten
     pv = pv[pv.index.get_level_values("TaakveldBalanspost").str.startswith(("A", "P")) == False]
+    lastencolumns = [col for col in lastencolumns if not col.startswith("L1.1")]
     pv = pv.drop(columns=batencolumns + lastencolumns + ['Primo', 'Ultimo'])
     
     df2 = pv.reset_index()
@@ -60,6 +64,16 @@ def add_class_data(df, jaar):
 
 def replace_gemeente_names(df):
     
-
+    # Create dict with gemeentenamen
+    gemeentenamen = {}
+    with open(NAMES, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.reader(file, delimiter='\t')
+        next(csv_reader)  # Skip header row
+        for row in csv_reader:
+            gemeentenamen[row[0]] = row[1]
+    output_df = df.replace(gemeentenamen)
+    
+    return output_df
+    
 if __name__ == "__main__":
     main()

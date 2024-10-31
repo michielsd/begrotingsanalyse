@@ -17,7 +17,7 @@ def main():
     if clusters:
         for key, value in clusters.items():
             print(key)
-            value.to_csv(OUTPUT_MAP + key + ".csv")
+            value.to_csv(OUTPUT_MAP + key + ".csv", sep=";") # ; For Nuenen Gerwen
 
 
 def get_gf_data(gf_map, uf_csv):
